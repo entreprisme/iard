@@ -14,3 +14,9 @@ cartes_grele.zip
 *.swp
 .idea/
 .vscode/
+venv/*
+env_vars.bat
+setup_env.bat
+.gitignore
+venv.bat
+git_init.bat
