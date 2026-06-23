@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Référentiel communes volumineux (à fournir dans data/, non versionné)
+data/correspondance-code-insee-code-postal.geojson
+
+# Cartes générées localement
+grele_*.html
+cartes_grele.zip
+
+# OS / éditeurs
+.DS_Store
+*.swp
+.idea/
+.vscode/
