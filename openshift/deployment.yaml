@@ -1,20 +1,20 @@
 # =============================================================================
 # Déploiement OpenShift - Webapp "Cartes de grêle"
 # App stateless : référentiels geojson embarqués dans l'image,
-# aucun secret ni volume persistant requis. Écoute sur le port 8010.
+# aucun secret ni volume persistant requis. Écoute sur le port 8080.
 # =============================================================================
-kind: Deployment
 apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: grele
   namespace: m-analytics-dda-dev-intra
+  name: grele
   labels:
     app: grele
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: grele
+  replicas: 3
   template:
     metadata:
       labels:
@@ -24,15 +24,14 @@ spec:
         - name: container
           image: >-
             artifactory.intra.matmut.fr/docker-matmut/data/data_science/dev/grele:dev-1.0.0
-          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8010
+            - containerPort: 8080
               protocol: TCP
           env:
+            - name: PORT            # fait écouter uvicorn sur 8080
+              value: '8080'
             - name: PYTHONPATH
               value: /home/defuser/app
-            - name: PORT
-              value: '8010'
             - name: LOG_LEVEL
               value: info
           resources:
@@ -47,40 +46,27 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8010
+              port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /health
-              port: 8010
+              port: 8080
             initialDelaySeconds: 20
             periodSeconds: 30
-            timeoutSeconds: 5
-            failureThreshold: 3
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-      restartPolicy: Always
-      terminationGracePeriodSeconds: 30
-      dnsPolicy: ClusterFirst
-      securityContext: {}
-      schedulerName: default-scheduler
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 100%
-      maxSurge: 100%
-  revisionHistoryLimit: 10
-  progressDeadlineSeconds: 600
+      maxSurge: 25%
+      maxUnavailable: 25%
 ---
-# Service interne (ClusterIP) exposant le port 8010 du pod.
-kind: Service
+# Service interne (ClusterIP) exposant le port 8080 du pod.
 apiVersion: v1
+kind: Service
 metadata:
-  name: grele
   namespace: m-analytics-dda-dev-intra
+  name: grele
   labels:
     app: grele
 spec:
@@ -88,7 +74,7 @@ spec:
     app: grele
   ports:
     - name: http
-      port: 8010
-      targetPort: 8010
+      port: 8080
+      targetPort: 8080
       protocol: TCP
   type: ClusterIP
