@@ -62,7 +62,6 @@ WORKDIR /home/defuser/app
 
 # Copie du code applicatif
 COPY ./backend ./backend
-COPY ./static ./static
 COPY ./data ./data
 COPY ./main.py ./main.py
 COPY ./entrypoint.sh ./entrypoint.sh

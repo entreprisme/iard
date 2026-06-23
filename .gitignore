@@ -5,9 +5,6 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Référentiel communes volumineux (à fournir dans data/, non versionné)
-data/correspondance-code-insee-code-postal.geojson
-
 # Cartes générées localement
 grele_*.html
 cartes_grele.zip
