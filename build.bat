@@ -31,7 +31,7 @@ if errorlevel 1 (
 docker tag %IMAGE_LATEST% %IMAGE_TAG%
 
 REM Run local de controle (referentiels geojson embarques, aucun volume/.env).
-docker run -d --name grele -p 8010:8010 %IMAGE_LATEST%
+docker run -d --name grele -p 8080:8080 %IMAGE_LATEST%
 
 docker push %IMAGE_TAG%
 if errorlevel 1 (

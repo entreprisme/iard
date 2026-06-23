@@ -28,14 +28,14 @@ Chemins surchargeables via `DATA_DIR`, `COMMUNES_GEOJSON`, `DEPARTEMENTS_GEOJSON
 ```bash
 pip install -r requirements.txt
 python main.py
-# puis http://localhost:8010
+# puis http://localhost:8080
 ```
 
 ## Lancer avec Docker
 
 ```bash
 docker build --build-arg BASE_IMAGE=python:3.11-slim --build-arg HTTP_PROXY="" -t cartes-grele .
-docker run -p 8010:8010 cartes-grele
+docker run -p 8080:8080 cartes-grele
 ```
 
 ## Structure

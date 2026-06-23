@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM test.bat - Test LOCAL de la webapp "Cartes de grele"
-REM Build de l'image Docker puis lancement sur http://localhost:8010
+REM Build de l'image Docker puis lancement sur http://localhost:8080
 REM ============================================================
 
 REM ---- Version de l'image (a modifier ici) -------------------
@@ -38,8 +38,8 @@ docker tag %IMAGE_LATEST% %IMAGE_TAG%
 
 REM Les referentiels geojson sont embarques dans l'image (COPY ./data),
 REM aucun volume ni .env n'est necessaire pour un test local.
-docker run -d --name grele -p 8010:8010 %IMAGE_LATEST%
+docker run -d --name grele -p 8080:8080 %IMAGE_LATEST%
 
-REM L'application est servie sur http://localhost:8010
+REM L'application est servie sur http://localhost:8080
 REM (page d'upload ; healthcheck sur /health)
 docker logs -f grele

@@ -5,7 +5,7 @@
 set -e
 
 echo "[entrypoint] Démarrage de la webapp Cartes de grêle"
-echo "[entrypoint] HOST=${HOST:-0.0.0.0} PORT=${PORT:-8010}"
+echo "[entrypoint] HOST=${HOST:-0.0.0.0} PORT=${PORT:-8080}"
 echo "[entrypoint] COMMUNES_GEOJSON=${COMMUNES_GEOJSON:-data/correspondance-code-insee-code-postal.geojson}"
 
 if [ ! -f "${COMMUNES_GEOJSON:-data/correspondance-code-insee-code-postal.geojson}" ]; then
@@ -16,5 +16,5 @@ fi
 
 exec uvicorn backend.app:app \
   --host "${HOST:-0.0.0.0}" \
-  --port "${PORT:-8010}" \
+  --port "${PORT:-8080}" \
   --log-level "${LOG_LEVEL:-info}"

@@ -77,7 +77,7 @@ USER defuser
 
 # Variables d'environnement applicatives
 ENV HOST=0.0.0.0
-ENV PORT=8010
+ENV PORT=8080
 ENV LOG_LEVEL=info
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/home/defuser/app
@@ -85,9 +85,9 @@ ENV DATA_DIR=data
 ENV COMMUNES_GEOJSON=data/correspondance-code-insee-code-postal.geojson
 ENV DEPARTEMENTS_GEOJSON=data/departement.geojson
 
-EXPOSE 8010
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8010/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
 ENTRYPOINT ["./entrypoint.sh"]

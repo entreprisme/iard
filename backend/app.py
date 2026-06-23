@@ -76,6 +76,9 @@ PAGE = """<!doctype html>
     vertical-align:-.15em;margin-right:.5rem}
   @keyframes spin{to{transform:rotate(360deg)}}
   .hint{margin-top:1.5rem;font-size:.8rem;color:#9ca3af;line-height:1.5}
+  .disclaimer{margin-top:1.25rem;padding:.75rem .9rem;border-radius:10px;
+    background:#fffbeb;border:1px solid #fde68a;color:#92400e;
+    font-size:.78rem;line-height:1.5}
 </style>
 </head>
 <body>
@@ -98,6 +101,10 @@ PAGE = """<!doctype html>
     <p class="hint">L'archive téléchargée contient deux cartes interactives :
       <code>grele_1_points.html</code> (points proportionnels) et
       <code>grele_2_polygones.html</code> (polygones communaux).</p>
+
+    <p class="disclaimer">⚠️ <b>Interface de développement</b> — mise à disposition
+      à seule fin d'évaluer la pertinence de la solution. Elle ne constitue aucun
+      engagement quant à sa disponibilité ou à sa mise à disposition pérenne.</p>
   </div>
 
 <script>
