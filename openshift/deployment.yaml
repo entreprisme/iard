@@ -1,0 +1,118 @@
+# =============================================================================
+# Déploiement OpenShift - Webapp "Cartes de grêle"
+# App stateless : référentiels geojson embarqués dans l'image,
+# aucun secret ni volume persistant requis. Écoute sur le port 8010.
+# =============================================================================
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: grele
+  namespace: m-analytics-dda-dev-intra
+  labels:
+    app: grele
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grele
+  template:
+    metadata:
+      labels:
+        app: grele
+    spec:
+      containers:
+        - name: container
+          image: >-
+            artifactory.intra.matmut.fr/docker-matmut/data/data_science/dev/grele:dev-1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8010
+              protocol: TCP
+          env:
+            - name: PYTHONPATH
+              value: /home/defuser/app
+            - name: PORT
+              value: '8010'
+            - name: LOG_LEVEL
+              value: info
+          resources:
+            requests:
+              cpu: 200m
+              # Chargement du référentiel communes (~36 Mo / 36k polygones)
+              # en mémoire via geopandas : on prévoit une marge confortable.
+              memory: 512Mi
+            limits:
+              cpu: '1'
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+      maxSurge: 100%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+---
+# Service interne (ClusterIP) exposant le port 8010 du pod.
+kind: Service
+apiVersion: v1
+metadata:
+  name: grele
+  namespace: m-analytics-dda-dev-intra
+  labels:
+    app: grele
+spec:
+  selector:
+    app: grele
+  ports:
+    - name: http
+      port: 8010
+      targetPort: 8010
+      protocol: TCP
+  type: ClusterIP
+---
+# Route OpenShift (HTTPS edge) pour exposer l'application à l'extérieur.
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: grele
+  namespace: m-analytics-dda-dev-intra
+  labels:
+    app: grele
+spec:
+  # URL d'accès : si 'host' est omis, OpenShift génère automatiquement
+  #   <nom-route>-<namespace>.<domaine-apps-du-cluster>
+  #   -> ex. grele-m-analytics-dda-dev-intra.apps.<cluster>.matmut.fr
+  # Pour imposer une URL précise, décommenter et adapter :
+  # host: grele.apps.intra.matmut.fr
+  to:
+    kind: Service
+    name: grele
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
