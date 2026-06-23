@@ -92,27 +92,3 @@ spec:
       targetPort: 8010
       protocol: TCP
   type: ClusterIP
----
-# Route OpenShift (HTTPS edge) pour exposer l'application à l'extérieur.
-kind: Route
-apiVersion: route.openshift.io/v1
-metadata:
-  name: grele
-  namespace: m-analytics-dda-dev-intra
-  labels:
-    app: grele
-spec:
-  # URL d'accès : si 'host' est omis, OpenShift génère automatiquement
-  #   <nom-route>-<namespace>.<domaine-apps-du-cluster>
-  #   -> ex. grele-m-analytics-dda-dev-intra.apps.<cluster>.matmut.fr
-  # Pour imposer une URL précise, décommenter et adapter :
-  # host: grele.apps.intra.matmut.fr
-  to:
-    kind: Service
-    name: grele
-    weight: 100
-  port:
-    targetPort: http
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
