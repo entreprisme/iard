@@ -238,6 +238,35 @@ def _centroids(gdf):
     return gdf.geometry.to_crs("EPSG:2154").centroid.to_crs("EPSG:4326")
 
 
+def _legend_html(colormap, vmin: float, vmax: float, caption: str, n: int = 24) -> str:
+    """Légende HTML/CSS statique (sans dépendance externe).
+
+    La légende branca (`colormap.add_to`) charge d3.js depuis un CDN via un
+    <script> bloquant en tête de page ; si ce CDN est injoignable (proxy
+    d'entreprise, poste hors-ligne), la page reste blanche. On reproduit donc
+    la légende en pur HTML/CSS, à partir des couleurs déjà calculées en Python.
+    """
+    stops = ", ".join(
+        f"{colormap.rgb_hex_str(vmin + (vmax - vmin) * i / n)} {100 * i / n:.0f}%"
+        for i in range(n + 1)
+    )
+    mid = (vmin + vmax) / 2
+    return f"""
+    <div style="position:fixed;bottom:24px;left:12px;z-index:9999;
+      background:rgba(255,255,255,.92);padding:10px 12px;border-radius:8px;
+      box-shadow:0 1px 6px rgba(0,0,0,.3);
+      font:12px/1.3 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#1f2937;">
+      <div style="font-weight:600;margin-bottom:6px;">{caption}</div>
+      <div style="display:flex;align-items:stretch;gap:6px;height:120px;">
+        <div style="width:14px;border-radius:3px;
+          background:linear-gradient(to top,{stops});"></div>
+        <div style="display:flex;flex-direction:column;justify-content:space-between;">
+          <span>{vmax:g}</span><span>{mid:g}</span><span>{vmin:g}</span>
+        </div>
+      </div>
+    </div>"""
+
+
 def parse_sinistres(xlsx_bytes: bytes) -> pd.DataFrame:
     """Lit et valide le fichier Excel « Classeur1 ». Lève HTTPException(400) si KO."""
     try:
@@ -282,7 +311,7 @@ def build_maps(xlsx_bytes: bytes):
         .scale(0, max_sin)
         .to_step(20)
     )
-    linear.caption = "Nombre de sinistres grêle"
+    legend = _legend_html(linear, 0, max_sin, "Nombre de sinistres grêle")
 
     def base_map():
         c = _centroids(gdf)
@@ -306,7 +335,7 @@ def build_maps(xlsx_bytes: bytes):
             fill=True,
             fill_color=linear(nb),
         ).add_to(m1)
-    linear.add_to(m1)
+    m1.get_root().html.add_child(folium.Element(legend))
 
     # Carte 2 : polygones communaux
     m2, _ = base_map()
@@ -328,7 +357,7 @@ def build_maps(xlsx_bytes: bytes):
         name="Sinistres grêle par commune",
     ).add_to(m2)
     folium.LayerControl(position="bottomright").add_to(m2)
-    linear.add_to(m2)
+    m2.get_root().html.add_child(folium.Element(legend))
 
     return m1.get_root().render(), m2.get_root().render()
 
