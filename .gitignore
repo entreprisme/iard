@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Cartes générées localement
+grele_*.html
+cartes_grele.zip
+
+# OS / éditeurs
+.DS_Store
+*.swp
+.idea/
+.vscode/
