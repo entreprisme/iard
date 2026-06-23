@@ -1,0 +1,80 @@
+# =============================================================================
+# Déploiement OpenShift - Webapp "Cartes de grêle"
+# App stateless : référentiels geojson embarqués dans l'image,
+# aucun secret ni volume persistant requis. Écoute sur le port 8080.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: m-analytics-dda-dev-intra
+  name: grele
+  labels:
+    app: grele
+spec:
+  selector:
+    matchLabels:
+      app: grele
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: grele
+    spec:
+      containers:
+        - name: container
+          image: >-
+            artifactory.intra.matmut.fr/docker-matmut/data/data_science/dev/grele:dev-1.0.0
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT            # fait écouter uvicorn sur 8080
+              value: '8080'
+            - name: PYTHONPATH
+              value: /home/defuser/app
+            - name: LOG_LEVEL
+              value: info
+          resources:
+            requests:
+              cpu: 200m
+              # Chargement du référentiel communes (~36 Mo / 36k polygones)
+              # en mémoire via geopandas : on prévoit une marge confortable.
+              memory: 512Mi
+            limits:
+              cpu: '1'
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 30
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+---
+# Service interne (ClusterIP) exposant le port 8080 du pod.
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: m-analytics-dda-dev-intra
+  name: grele
+  labels:
+    app: grele
+spec:
+  selector:
+    app: grele
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
