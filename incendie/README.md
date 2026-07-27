@@ -47,10 +47,10 @@ la zone brûlée, en Lambert 93 :
 
 | Niveau | Règle |
 |---|---|
-| Certain — dans l'emprise brûlée | le point tombe dans l'emprise d'un bâti relevé |
-| Très probable — à moins de 10 m | ≤ 10 m d'un bâti relevé |
-| Probable — à moins de 25 m | ≤ 25 m d'un bâti relevé |
-| Exposé — dans le périmètre du feu | dans le contour, > 25 m de tout bâti relevé |
+| Certain — emprise ou moins de 5 m | le point tombe dans l'emprise d'un bâti relevé, ou à moins de 5 m |
+| Très probable — de 5 à 15 m | 5 à 15 m d'un bâti relevé |
+| Probable — de 15 à 30 m | 15 à 30 m d'un bâti relevé |
+| Exposé — dans le périmètre du feu | dans le contour, au-delà de 30 m de tout bâti relevé |
 | Hors périmètre | reste |
 
 Le vocabulaire est volontairement prudent : la couche source s'appelle « Bâti
@@ -60,6 +60,10 @@ qualifie pas le degré de destruction, donc le notebook ne parle jamais de bâti
 
 Les trois premiers niveaux constituent la réponse à « effectivement impactés ».
 Le notebook produit un tableau de sensibilité (0 à 100 m) pour objectiver ce choix.
+
+Les seuils se règlent par `SEUIL_CERTAIN_M`, `SEUIL_TRES_PROBABLE_M` et
+`SEUIL_PROBABLE_M`. Les libellés en sont dérivés, y compris dans la légende de la
+carte et le rapport : changer un seuil ne laisse pas de texte périmé derrière lui.
 
 ### Le géocodage borne la conclusion
 
