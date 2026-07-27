@@ -9,6 +9,10 @@ venv/
 grele_*.html
 cartes_grele.zip
 
+# Livrables incendie : contiennent des données sociétaires (identifiants, adresses)
+livrables/
+data_incendie/export_societaires.csv
+
 # OS / éditeurs
 .DS_Store
 *.swp
