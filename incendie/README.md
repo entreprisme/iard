@@ -42,16 +42,21 @@ Les données incendie sont toujours les données réelles, quel que soit le mode
 
 ## Méthode
 
-Le point GPS de chaque contrat est comparé à l'emprise des bâtiments effectivement
-brûlés, en Lambert 93 :
+Le point GPS de chaque contrat est comparé à l'emprise des bâtiments relevés dans
+la zone brûlée, en Lambert 93 :
 
 | Niveau | Règle |
 |---|---|
-| Bâti détruit (certain) | le point tombe dans l'emprise d'un bâti brûlé |
-| Impact très probable | ≤ 10 m d'un bâti brûlé |
-| Impact probable | ≤ 25 m d'un bâti brûlé |
-| Dans le périmètre du feu | dans le contour, > 25 m de tout bâti brûlé |
+| Certain — dans l'emprise brûlée | le point tombe dans l'emprise d'un bâti relevé |
+| Très probable — à moins de 10 m | ≤ 10 m d'un bâti relevé |
+| Probable — à moins de 25 m | ≤ 25 m d'un bâti relevé |
+| Exposé — dans le périmètre du feu | dans le contour, > 25 m de tout bâti relevé |
 | Hors périmètre | reste |
+
+Le vocabulaire est volontairement prudent : la couche source s'appelle « Bâti
+**concerné** » et recense les bâtiments *situés dans l'emprise brûlée*. Elle ne
+qualifie pas le degré de destruction, donc le notebook ne parle jamais de bâti
+« détruit ».
 
 Les trois premiers niveaux constituent la réponse à « effectivement impactés ».
 Le notebook produit un tableau de sensibilité (0 à 100 m) pour objectiver ce choix.
