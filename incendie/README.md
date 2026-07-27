@@ -61,6 +61,25 @@ qualifie pas le degré de destruction, donc le notebook ne parle jamais de bâti
 Les trois premiers niveaux constituent la réponse à « effectivement impactés ».
 Le notebook produit un tableau de sensibilité (0 à 100 m) pour objectiver ce choix.
 
+### Le géocodage borne la conclusion
+
+La colonne `level_contrat_mgar` de `contrat_mgar_gps_iris` donne le niveau de
+géocodage, au sens de la Base Adresse Nationale. Une distance ne vaut que ce que
+vaut la position dont elle part :
+
+| `level_contrat_mgar` | Point posé sur | Traitement |
+|---|---|---|
+| `housenumber` | le point adresse | seuils appliqués tels quels |
+| `street` | l'axe de la voie | plafonné à « très probable », jamais « certain » |
+| `locality` | le centre d'un lieu-dit | **exclu du comptage** |
+| `municipality` | le centroïde de la commune | **exclu du comptage** |
+
+Exclure les deux derniers évite des faux positifs mécaniques : le centroïde d'une
+commune sinistrée tombe forcément près des bâtis brûlés. Ces contrats ne sont pas
+perdus, ils sortent sous « position trop imprécise pour conclure » et doivent être
+instruits autrement. Réglages : `PLAFONNER_NIVEAU_VOIE` et
+`NIVEAUX_GEOCODAGE_INEXPLOITABLES`.
+
 ## Les deux axes d'analyse
 
 **Segment** — à quoi sert le logement. Lu sur **`code_sous_type`** : `1`–`5` → RP,
