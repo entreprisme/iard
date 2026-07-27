@@ -13,7 +13,7 @@ incendie/
   carte_incendie_societaires.ipynb   # le notebook (à exécuter de haut en bas)
   assets/                            # Leaflet + jQuery embarqués (HTML sans CDN)
 data_incendie/
-  FEU GIRONDE/                       # contour + bâtis brûlés (SIG)
+  FEU GIRONDE/                       # contour du feu + bâtis de l'emprise
   FEU BISCAROSSE/
 livrables/                           # produit par le notebook — NON versionné
   carte_incendie_societaires.html    # le livrable one shot
