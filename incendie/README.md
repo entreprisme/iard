@@ -61,9 +61,29 @@ qualifie pas le degré de destruction, donc le notebook ne parle jamais de bâti
 Les trois premiers niveaux constituent la réponse à « effectivement impactés ».
 Le notebook produit un tableau de sensibilité (0 à 100 m) pour objectiver ce choix.
 
-La segmentation RP / RS / PNO se lit sur **`code_sous_type`** :
-`1`–`5` → RP, `6` → PNO, `7` → RS. Les autres modalités (jeune, étudiant, hébergé…)
-sont hors demande mais comptées séparément.
+## Les deux axes d'analyse
+
+**Segment** — à quoi sert le logement. Lu sur **`code_sous_type`** : `1`–`5` → RP,
+`6` → PNO, `7` → RS. Les autres modalités (jeune, étudiant, hébergé…) sont hors
+demande mais comptées séparément.
+
+**Statut d'occupation** — qui supporte le dommage au bâti. Lu sur
+**`code_qualite_assure_habitation`**, regroupé en trois postes :
+
+| Statut | Modalités source |
+|---|---|
+| Propriétaire | `P` propriétaire, `N` nu-propriétaire, `U` usufruitier |
+| Locataire | `L` locataire, `I` colocation individuelle, `G` colocation commune |
+| Autre / non renseigné | `H` hébergé gratuit, `C` logement de service, `R` maison de retraite, `M` établissement médical, `S` sans résidence fixe |
+
+Les statuts qui ne relèvent ni du propriétaire ni du locataire restent à part plutôt
+que d'être rattachés arbitrairement. Le détail des modalités reste disponible dans la
+colonne `qualite` de l'export CSV.
+
+Sur la carte, la **couleur** porte le segment et la **forme** le statut : disque plein
+pour un propriétaire, anneau pour un locataire, contour gris pour les autres — une
+seule dimension colorée, conformément aux règles de lisibilité en vision des couleurs
+déficiente.
 
 ## Ajouter un nouveau feu
 
