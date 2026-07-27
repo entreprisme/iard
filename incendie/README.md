@@ -34,11 +34,16 @@ Le notebook cherche les contrats dans cet ordre :
 1. **BigQuery** — la requête est dans le notebook (jointure `contrat_mgar_gps_iris`
    × `contrat_mgar`, pré-filtrée sur l'emprise des deux feux) ;
 2. **export local** — déposer le résultat de cette requête dans
-   `data_incendie/export_societaires.csv` ;
-3. **simulation** — jeu de test synthétique, pour dérouler la chaîne sans données
-   réelles. Le HTML produit affiche alors un bandeau d'avertissement.
+   `data_incendie/export_societaires.csv`.
 
-Les données incendie sont toujours les données réelles, quel que soit le mode.
+À défaut, le notebook **s'arrête** avec un message indiquant les deux sources
+tentées. Il n'existe pas de repli sur des données de test : un livrable
+d'apparence normale construit sur autre chose que les données réelles serait plus
+dangereux qu'une erreur.
+
+Même logique pour les sinistres, avec `data_incendie/export_sinistres.csv`. Si la
+table est inaccessible, `CROISER_SINISTRES = False` produit le livrable sans ce
+croisement — donc sans son seul contrôle externe.
 
 ## Méthode
 
