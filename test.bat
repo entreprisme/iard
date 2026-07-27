@@ -5,7 +5,7 @@ REM Build de l'image Docker puis lancement sur http://localhost:8080
 REM ============================================================
 
 REM ---- Version de l'image (a modifier ici) -------------------
-set VERSION=dev-1.0.0
+set VERSION=dev-1.0.1
 REM ------------------------------------------------------------
 
 REM ---- Images (artifactory interne Matmut) -------------------

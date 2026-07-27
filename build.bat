@@ -5,7 +5,7 @@ REM Build de l'image, tag, run local de controle puis push artifactory.
 REM ============================================================
 
 REM ---- Version de l'image (a modifier ici) -------------------
-set VERSION=dev-1.0.0
+set VERSION=dev-1.0.1
 REM ------------------------------------------------------------
 
 set IMAGE_LATEST=artifactory.intra.matmut.fr/docker/grele:latest
