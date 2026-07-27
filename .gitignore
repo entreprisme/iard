@@ -12,6 +12,7 @@ cartes_grele.zip
 # Livrables incendie : contiennent des données sociétaires (identifiants, adresses)
 livrables/
 data_incendie/export_societaires.csv
+data_incendie/export_sinistres.csv
 
 # OS / éditeurs
 .DS_Store
