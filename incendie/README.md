@@ -1,24 +1,44 @@
 # Bâtis de sociétaires impactés par les incendies
 
-Notebook d'analyse répondant à la demande :
+Analyse répondant à la demande :
 
 > *« Je souhaiterais savoir combien et positionner géographiquement les bâtis
 > (RP, RS, PNO) de nos sociétaires qui auraient effectivement été impactés par
 > les incendies. »*
 
-## Contenu
+## Organisation
+
+Le code est un package Python ; le notebook n'est qu'un **lanceur**. Il appelle
+les fonctions dans l'ordre en affichant les diagnostics, mais ne contient aucune
+logique. Reprendre le traitement, c'est donc ouvrir un module — pas un notebook
+de 2 000 lignes.
 
 ```
 incendie/
-  carte_incendie_societaires.ipynb   # le notebook (à exécuter de haut en bas)
+  carte_incendie_societaires.ipynb   # notebook de lancement, à exécuter de haut en bas
+  analyse/                           # le traitement
+    config.py       les paramètres — le seul fichier à ouvrir en usage courant
+    donnees.py      emprises des feux, requêtes SQL, extractions
+    traitement.py   diagnostics, segmentation, géocodage, appariement spatial
+    resultats.py    compteurs, tableaux, export de gestion
+    carte.py        carte interactive
+    rapport.py      livrable HTML
+    __init__.py     `analyser()` : tout l'enchaînement d'un bloc
   assets/                            # Leaflet + jQuery embarqués (HTML sans CDN)
 data_incendie/
   FEU GIRONDE/                       # contour du feu + bâtis de l'emprise
   FEU BISCAROSSE/
-livrables/                           # produit par le notebook — NON versionné
+  FEU VAR/                           # contour seul — pas de couche bâti livrée
+livrables/                           # produit par le traitement — NON versionné
   carte_incendie_societaires.html    # le livrable one shot
   contrats_impactes.csv              # export pour la gestion
 ```
+
+Chaque module lit `config` **au moment de l'appel**, jamais à l'import. Une
+valeur réaffectée depuis le notebook est donc prise en compte, sans avoir à
+relancer le noyau. C'est aussi pour cela que les valeurs dérivées (feux retenus,
+libellés, niveaux d'impact) sont des **fonctions** — `cfg.feux_actifs()`,
+`cfg.niveaux_impactes()` — et non des constantes figées à l'import.
 
 ## Exécution
 
@@ -29,14 +49,39 @@ pip install google-cloud-bigquery db-dtypes
 jupyter lab carte_incendie_societaires.ipynb
 ```
 
-Le notebook cherche les contrats dans cet ordre :
+Les deux réglages courants sont dans la première cellule du notebook :
 
-1. **BigQuery** — la requête est dans le notebook (jointure `contrat_mgar_gps_iris`
-   × `contrat_mgar`, pré-filtrée sur l'emprise des deux feux) ;
+```python
+cfg.FEUX_A_TRAITER = ("Gironde", "Biscarrosse")   # ("Var",) → Pontevès seul
+cfg.INTEGRER_PERIMETRE = False                     # cf. plus bas
+```
+
+Tout le reste se règle dans `analyse/config.py`.
+
+En automatisé — cron, relance, test — le même traitement tient en trois lignes :
+
+```python
+from analyse import config as cfg, analyser
+cfg.FEUX_A_TRAITER = ("Var",)
+cfg.INTEGRER_PERIMETRE = True
+resultat = analyser(silencieux=True)      # dict des objets intermédiaires
+```
+
+`analyser()` renvoie contours, bâtis, contrats, sinistres, appariement,
+compteurs, export, carte et chemin du livrable : on peut inspecter une étape
+sans relancer, ou en tester une isolément.
+
+## Source des données
+
+Le traitement cherche les contrats dans cet ordre :
+
+1. **BigQuery** — la requête est construite par `donnees.requete_contrats()`
+   (jointure `contrat_mgar_gps_iris` × `contrat_mgar`, pré-filtrée sur l'emprise
+   des feux traités) ;
 2. **export local** — déposer le résultat de cette requête dans
    `data_incendie/export_societaires.csv`.
 
-À défaut, le notebook **s'arrête** avec un message indiquant les deux sources
+À défaut, le traitement **s'arrête** avec un message indiquant les deux sources
 tentées. Il n'existe pas de repli sur des données de test : un livrable
 d'apparence normale construit sur autre chose que les données réelles serait plus
 dangereux qu'une erreur.
@@ -44,6 +89,15 @@ dangereux qu'une erreur.
 Même logique pour les sinistres, avec `data_incendie/export_sinistres.csv`. Si la
 table est inaccessible, `CROISER_SINISTRES = False` produit le livrable sans ce
 croisement — donc sans son seul contrôle externe.
+
+### Un contrat = (id_societaire, numero_intercalaire)
+
+Un même bien porte plusieurs `id` de contrat, les dépendances recevant leur
+propre numéro. La clé métier est donc le couple **`id_societaire` +
+`numero_intercalaire`**, et le numéro de contrat n'apparaît nulle part dans les
+analyses. Le SQL retient, pour chaque couple, le contrat de **dernière
+`date_effet`** (`tech_date_fin_historisation IS NULL`, non résilié), et c'est
+**son** adresse qui sert à rejoindre la table de géocodage.
 
 ## Méthode
 
@@ -60,15 +114,34 @@ la zone brûlée, en Lambert 93 :
 
 Le vocabulaire est volontairement prudent : la couche source s'appelle « Bâti
 **concerné** » et recense les bâtiments *situés dans l'emprise brûlée*. Elle ne
-qualifie pas le degré de destruction, donc le notebook ne parle jamais de bâti
+qualifie pas le degré de destruction, donc le traitement ne parle jamais de bâti
 « détruit ».
 
 Les trois premiers niveaux constituent la réponse à « effectivement impactés ».
-Le notebook produit un tableau de sensibilité (0 à 100 m) pour objectiver ce choix.
+Un tableau de sensibilité (0 à 100 m) objective ce choix.
 
 Les seuils se règlent par `SEUIL_CERTAIN_M`, `SEUIL_TRES_PROBABLE_M` et
 `SEUIL_PROBABLE_M`. Les libellés en sont dérivés, y compris dans la légende de la
 carte et le rapport : changer un seuil ne laisse pas de texte périmé derrière lui.
+
+**Il n'y a pas de distance au contour du feu.** Une trace de brûlé n'est pas un
+gradient : elle contient des îlots intacts en plein cœur et des bâtiments touchés
+sur le bord. La distance au contour ne porterait donc aucune information sur la
+probabilité d'impact.
+
+### `INTEGRER_PERIMETRE`
+
+Compte comme impactés les contrats situés dans le périmètre mais à l'écart de
+tout bâti relevé, sous un niveau distinct qui dit exactement ce qu'on en sait.
+
+À activer quand le périmètre est une trace de brûlé précise — le contour du Var
+est une vectorisation satellite, y être veut alors dire quelque chose. À laisser
+désactivé quand le contour est une enveloppe large : celui de Gironde couvre
+37 000 ha en grande majorité forestiers, et tout y compter noierait les impacts
+réels dans l'exposition.
+
+C'est aussi la seule façon de traiter un feu dont la couche de bâtiments n'a pas
+été livrée — cas du Var.
 
 ### Le géocodage borne la conclusion
 
@@ -89,6 +162,24 @@ perdus, ils sortent sous « position trop imprécise pour conclure » et doivent
 instruits autrement. Réglages : `PLAFONNER_NIVEAU_VOIE` et
 `NIVEAUX_GEOCODAGE_INEXPLOITABLES`.
 
+La table de géocodage n'est pas à la maille contrat : elle porte une dizaine de
+lignes par contrat, très majoritairement identiques. Quand un contrat garde
+plusieurs positions concurrentes, on retient **le niveau de géocodage le plus
+précis** (`RANG_NIVEAU_GEOCODAGE`), puis, à niveau égal, la position la plus
+centrale du groupe. Le critère est neutre par construction : il ne regarde pas où
+sont les bâtis brûlés, donc il ne peut pas fabriquer d'impact. Les lignes écartées
+sont comptées et l'écart entre positions est signalé au-delà de
+`SEUIL_ECART_POSITIONS_M`.
+
+## Croisement avec les sinistres déclarés
+
+`situation_sinistre_mgar`, joint sur `(id_societaire, numero_intercalaire)` :
+dernier `numero_mouvement`, `code_descriptif_sinistre = '05'` (incendie),
+`date_enregistrement` postérieure au départ du premier feu traité, dossier
+ouvert. C'est le **seul contrôle externe** de la méthode : une déclaration
+d'incendie sur un contrat que la géométrie classe « certain » confirme les deux.
+La matrice de validation croise les deux lectures.
+
 ## Les deux axes d'analyse
 
 **Segment** — à quoi sert le logement. Lu sur **`code_sous_type`** : `1`–`5` → RP,
@@ -108,16 +199,18 @@ Les statuts qui ne relèvent ni du propriétaire ni du locataire restent à part
 que d'être rattachés arbitrairement. Le détail des modalités reste disponible dans la
 colonne `qualite` de l'export CSV.
 
-Sur la carte, la **couleur** porte le segment et la **forme** le statut : disque plein
-pour un propriétaire, anneau pour un locataire, contour gris pour les autres — une
-seule dimension colorée, conformément aux règles de lisibilité en vision des couleurs
-déficiente.
+Sur la carte, la **couleur** porte le segment, la **forme** le statut — disque plein
+pour un propriétaire, anneau pour un locataire —, le **triangle** signale un sinistre
+incendie déclaré et la **taille** le degré de certitude. Une seule dimension colorée,
+conformément aux règles de lisibilité en vision des couleurs déficiente.
 
 ## Ajouter un nouveau feu
 
-Déposer le dossier dans `data_incendie/` et ajouter une entrée au dictionnaire
-`FEUX` du notebook (nom du dossier + motifs de fichiers). Le reste suit
-automatiquement : chargement, appariement, compteurs, carte et HTML.
+Déposer le dossier dans `data_incendie/`, ajouter une entrée au dictionnaire
+`FEUX` de `analyse/config.py` (dossier, motifs de fichiers, date de départ, date
+de relevé), puis citer son nom dans `FEUX_A_TRAITER`. Le reste suit
+automatiquement : chargement, appariement, compteurs, carte et HTML. Un nom absent
+du catalogue lève une erreur explicite avec la liste des choix possibles.
 
 ## Points d'attention sur les données source
 
@@ -130,6 +223,10 @@ automatiquement : chargement, appariement, compteurs, carte et HTML.
 - La couche « bâti concerné » recense les bâtiments **situés dans l'emprise
   brûlée** ; elle ne qualifie pas le degré de destruction. Emprise minimale 50 m²,
   donc les petites annexes sont absentes.
+- **Le Var n'a pas de couche bâti.** L'archive livrée ne contient que le contour ;
+  le nombre de bâtiments dans l'emprise n'existe que sur l'image jointe. Ce feu ne
+  peut donc être traité qu'avec `INTEGRER_PERIMETRE = True`, ce que le chargement
+  rappelle par une erreur explicite le cas échéant.
 
 ## Dépendance réseau
 
