@@ -165,11 +165,23 @@ instruits autrement. Réglages : `PLAFONNER_NIVEAU_VOIE` et
 La table de géocodage n'est pas à la maille contrat : elle porte une dizaine de
 lignes par contrat, très majoritairement identiques. Quand un contrat garde
 plusieurs positions concurrentes, on retient **le niveau de géocodage le plus
-précis** (`RANG_NIVEAU_GEOCODAGE`), puis, à niveau égal, la position la plus
-centrale du groupe. Le critère est neutre par construction : il ne regarde pas où
-sont les bâtis brûlés, donc il ne peut pas fabriquer d'impact. Les lignes écartées
-sont comptées et l'écart entre positions est signalé au-delà de
-`SEUIL_ECART_POSITIONS_M`.
+précis** (`RANG_NIVEAU_GEOCODAGE`, `housenumber` en tête), puis, à niveau égal,
+**la première ligne venue**. Les deux critères sont neutres par construction : ils
+ne regardent pas où sont les bâtis brûlés, donc ils ne peuvent pas fabriquer
+d'impact.
+
+Le second critère n'arbitre rien, et c'est assumé — le niveau n'est pas une clé
+d'unicité. Un cas réel : un contrat de Salon-de-Provence porte **quatre positions
+`housenumber` pour la même adresse, réparties sur 1 900 m**, dont l'une à 55 m
+d'une position étiquetée `street`. Aucune information disponible ici ne permet de
+les départager ; prendre la première est un choix par défaut, pas une
+localisation.
+
+C'est pourquoi le choix est tracé : `ecart_positions_m` mesure l'étendue des
+positions **du niveau retenu** — les seules réellement en concurrence — et
+`position_incertaine` marque celles qui se jouent au-delà de
+`SEUIL_ECART_POSITIONS_M`. Les deux colonnes sont dans l'export CSV, et les
+lignes écartées sont comptées dans les diagnostics.
 
 ## Croisement avec les sinistres déclarés
 

@@ -371,12 +371,19 @@ def _dedoublonner(appar: gpd.GeoDataFrame, col_precision: str | None,
     """Un contrat, une position.
 
     Les lignes en double sont des géocodages concurrents du même contrat. On
-    retient le plus précis — `level_contrat_mgar` fait foi — puis, à niveau égal,
-    la position la plus centrale parmi les candidats.
+    retient le plus précis — `level_contrat_mgar` fait foi, `housenumber` en
+    tête — puis, à niveau égal, la première ligne venue.
 
-    Ces deux critères ont en commun d'être **neutres**. Départager sur la
+    Le second critère n'arbitre rien : à niveau égal les positions concurrentes
+    peuvent être distantes de plusieurs kilomètres, et aucune information
+    disponible ici ne permet de les départager. Prendre la première est un choix
+    par défaut assumé, et surtout **neutre** — comme le niveau. Départager sur la
     distance au bâti reviendrait à retenir systématiquement la position la plus
     incriminante, donc à surestimer l'impact par construction.
+
+    Le caractère arbitraire du choix n'est pas perdu : `ecart_positions_m` mesure
+    l'étendue des candidats et `position_incertaine` signale ceux qui se jouent
+    au-delà de SEUIL_ECART_POSITIONS_M.
     """
     appar["id_plusieurs_positions"] = appar["id"].duplicated(keep=False)
 
@@ -394,26 +401,31 @@ def _dedoublonner(appar: gpd.GeoDataFrame, col_precision: str | None,
     appar["_rang_geo"] = (appar["niveau_geocodage"].map(cfg.RANG_NIVEAU_GEOCODAGE).fillna(9)
                           if col_precision else 0)
 
+    # Seules les lignes du meilleur niveau sont en concurrence : c'est entre
+    # elles, et elles seules, que le choix se joue. Mesurer l'étendue sur toutes
+    # les lignes signalerait à tort le contrat dont l'unique `housenumber` est net
+    # mais qui traîne trois centroïdes de commune à 40 km.
     meilleur = appar.groupby("id")["_rang_geo"].transform("min")
     candidat = appar["_rang_geo"] == meilleur
-    x, y = appar.geometry.x, appar.geometry.y
-    cx = x.where(candidat).groupby(appar["id"]).transform("mean")
-    cy = y.where(candidat).groupby(appar["id"]).transform("mean")
-    appar["_d_centre"] = np.where(candidat, np.hypot(x - cx, y - cy), np.inf)
 
     # Étendue des positions candidates : deux géocodages à 5 m l'un de l'autre
     # sont sans conséquence, à 3 km la position retenue relève du tirage au sort.
-    etendue = (appar.assign(_x=x, _y=y).groupby("id")
-                    .agg(x0=("_x", "min"), x1=("_x", "max"),
-                         y0=("_y", "min"), y1=("_y", "max")))
-    etendue["ecart"] = np.hypot(etendue.x1 - etendue.x0, etendue.y1 - etendue.y0)
-    appar["ecart_positions_m"] = appar["id"].map(etendue["ecart"]).round(1)
+    cand = appar.loc[candidat]
+    etendue = (pd.DataFrame({"id": cand["id"].to_numpy(),
+                             "_x": cand.geometry.x.to_numpy(),
+                             "_y": cand.geometry.y.to_numpy()})
+                 .groupby("id").agg(x0=("_x", "min"), x1=("_x", "max"),
+                                    y0=("_y", "min"), y1=("_y", "max")))
+    ecart = np.hypot(etendue.x1 - etendue.x0, etendue.y1 - etendue.y0)
+    appar["ecart_positions_m"] = appar["id"].map(ecart).round(1)
     appar["position_incertaine"] = appar["ecart_positions_m"] > cfg.SEUIL_ECART_POSITIONS_M
 
-    appar = (appar.sort_values(["_rang_geo", "_d_centre"], na_position="last")
+    # `kind="stable"` : à niveau égal l'ordre d'origine est préservé, donc
+    # `keep="first"` retient bien la première ligne venue.
+    appar = (appar.sort_values("_rang_geo", kind="stable")
                   .drop_duplicates(subset="id", keep="first")
                   .sort_index()
-                  .drop(columns=["_rang_geo", "_d_centre"], errors="ignore"))
+                  .drop(columns=["_rang_geo"], errors="ignore"))
 
     if avant == len(appar):
         return appar
