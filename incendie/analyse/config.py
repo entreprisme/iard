@@ -108,6 +108,12 @@ def libelle_feux() -> str:
 CRS_METRIQUE = 2154        # Lambert 93 : toutes les distances sont calculées ici
 CRS_AFFICHAGE = 4326       # WGS84 : projection de la carte
 
+# Marge autour de chaque emprise pour le pré-filtre de la requête. Elle doit
+# rester nettement au-dessus du plus grand seuil d'appariement : un contrat à
+# 30 m du bord extérieur du contour doit entrer dans l'extraction pour pouvoir
+# être classé. 2 km laissent aussi voir le voisinage immédiat sur la carte.
+MARGE_REQUETE_M = 2_000
+
 # --------------------------------------------------------------------------- #
 # Seuils d'appariement (mètres)
 # --------------------------------------------------------------------------- #

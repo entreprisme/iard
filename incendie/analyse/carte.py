@@ -219,9 +219,8 @@ def _legende() -> str:
 
 
 def construire(appar: gpd.GeoDataFrame, batis: gpd.GeoDataFrame,
-               contours: gpd.GeoDataFrame, bbox, afficher=print) -> folium.Map:
+               contours: gpd.GeoDataFrame, emprises, afficher=print) -> folium.Map:
     """Assemble la carte : emprises, bâtis, contrats, couches de contexte."""
-    lon_min, lat_min, lon_max, lat_max = bbox
     carte_pts = appar.to_crs(cfg.CRS_AFFICHAGE)
     contours_wgs = contours.to_crs(cfg.CRS_AFFICHAGE)
     centre = contours_wgs.geometry.union_all().centroid
@@ -313,12 +312,13 @@ def construire(appar: gpd.GeoDataFrame, batis: gpd.GeoDataFrame,
     # retenus. Sans eux la carte ne montre que des impacts et ne dit rien de ce
     # qui a été regardé.
     fg_zone = folium.FeatureGroup(name="Limite de la zone analysée", show=True)
-    folium.Rectangle(
-        bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-        color="#52514e", weight=1.5, dash_array="7,6", fill=False,
-        tooltip=("Limite de la zone analysée — "
-                 f"lon [{lon_min}, {lon_max}] / lat [{lat_min}, {lat_max}]"),
-    ).add_to(fg_zone)
+    for nom, lon_min, lat_min, lon_max, lat_max in emprises:
+        folium.Rectangle(
+            bounds=[[lat_min, lon_min], [lat_max, lon_max]],
+            color="#52514e", weight=1.5, dash_array="7,6", fill=False,
+            tooltip=(f"Limite de la zone analysée — {nom}<br>"
+                     f"lon [{lon_min}, {lon_max}] / lat [{lat_min}, {lat_max}]"),
+        ).add_to(fg_zone)
     fg_zone.add_to(m)
 
     demande = carte_pts[carte_pts["dans_perimetre_demande"]]

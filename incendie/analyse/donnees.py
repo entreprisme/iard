@@ -151,21 +151,54 @@ def controle_recouvrement(contours: gpd.GeoDataFrame, batis: gpd.GeoDataFrame,
               "contour (le reste affleure la limite du périmètre)")
 
 
-def emprise_requete(contours: gpd.GeoDataFrame,
-                    afficher=print) -> tuple[float, float, float, float]:
-    """Bounding box des feux, élargie de 2 km, en WGS84 : le pré-filtre de la
-    requête. Sans elle on rapatrierait les contrats de la France entière."""
-    bbox = contours.geometry.buffer(2_000).to_crs(cfg.CRS_AFFICHAGE).total_bounds
-    lon_min, lat_min, lon_max, lat_max = [round(v, 4) for v in bbox]
-    afficher(f"Emprise interrogée : lon [{lon_min}, {lon_max}] — "
-          f"lat [{lat_min}, {lat_max}]")
-    return lon_min, lat_min, lon_max, lat_max
+def emprises_requete(contours: gpd.GeoDataFrame, afficher=print) -> list[tuple]:
+    """Une bounding box **par feu**, élargie de MARGE_REQUETE_M, en WGS84.
+
+    C'est le pré-filtre de la requête : sans lui on rapatrierait les contrats de
+    la France entière.
+
+    Une boîte par feu, et non une boîte englobant tout : les feux traités peuvent
+    être aux deux bouts du pays. Le rectangle couvrant Gironde + Biscarrosse + Var
+    mesure 101 000 km² — 229 fois la surface réellement brûlée — et va de
+    l'Atlantique aux Alpes. Il ramènerait des dizaines de milliers de contrats
+    sans aucun rapport avec les feux : sans effet sur le comptage, qui reste
+    géométrique, mais de quoi noyer les diagnostics et faire scanner à BigQuery
+    un volume sans commune mesure avec la question posée.
+
+    Renvoie [(feu, lon_min, lat_min, lon_max, lat_max), …].
+    """
+    boites = []
+    for nom in contours["feu"].drop_duplicates():
+        part = contours[contours["feu"] == nom]
+        b = (part.geometry.buffer(cfg.MARGE_REQUETE_M)
+                 .to_crs(cfg.CRS_AFFICHAGE).total_bounds)
+        boites.append((nom, *(round(v, 4) for v in b)))
+
+    afficher(f"Zone interrogée — {len(boites)} rectangle(s), "
+             f"marge de {cfg.MARGE_REQUETE_M / 1000:.0f} km :")
+    for nom, lon_min, lat_min, lon_max, lat_max in boites:
+        afficher(f"  {nom:<14} lon [{lon_min}, {lon_max}]  "
+                 f"lat [{lat_min}, {lat_max}]")
+    return boites
 
 
 # --------------------------------------------------------------------------- #
 # Requêtes
 # --------------------------------------------------------------------------- #
-def requete_contrats(bbox: tuple[float, float, float, float]) -> str:
+def _filtre_emprises(emprises: list[tuple], col_lon: str, col_lat: str) -> str:
+    """Clause WHERE : l'union des rectangles, un par feu.
+
+    Un OR de rectangles plutôt qu'un rectangle englobant — voir emprises_requete.
+    """
+    clauses = [
+        f"({col_lon} BETWEEN {lon_min} AND {lon_max}"
+        f" AND {col_lat} BETWEEN {lat_min} AND {lat_max})   -- {nom}"
+        for nom, lon_min, lat_min, lon_max, lat_max in emprises
+    ]
+    return "\n       OR ".join(clauses)
+
+
+def requete_contrats(emprises: list[tuple]) -> str:
     """Contrats habitation en cours, géolocalisés, dans l'emprise des feux.
 
     Deux sources de multiplicité, traitées dans cet ordre.
@@ -183,7 +216,7 @@ def requete_contrats(bbox: tuple[float, float, float, float]) -> str:
     une colonne GEOGRAPHY. La géométrie est reconstruite depuis lon/lat ; si le
     WKT est nécessaire, ST_ASTEXT(t1.geom) est une STRING et supporte DISTINCT.
     """
-    lon_min, lat_min, lon_max, lat_max = bbox
+    filtre = _filtre_emprises(emprises, "t1.lon_contrat_mgar", "t1.lat_contrat_mgar")
     opt_cte = "".join(f",\n    {c}" for c in cfg.COLONNES_FACULTATIVES)
     opt_sel = "".join(f",\n  c.{c}" for c in cfg.COLONNES_FACULTATIVES)
     join_adresse = ("""
@@ -233,9 +266,10 @@ INNER JOIN `{cfg.TABLE_GPS}` t1
   ON  t1.id_societaire              = c.id_societaire
   AND t1.numero_intercalaire        = c.numero_intercalaire
   AND t1.code_postal_adresse_risque = c.code_postal_adresse_risque{join_adresse}
--- Pré-filtre sur l'emprise des feux : évite de rapatrier la France entière
-WHERE t1.lon_contrat_mgar BETWEEN {lon_min} AND {lon_max}
-  AND t1.lat_contrat_mgar BETWEEN {lat_min} AND {lat_max}
+-- Pré-filtre : un rectangle par feu, pas un rectangle englobant — celui qui
+-- couvrirait des feux éloignés ramènerait la moitié du pays.
+WHERE (   {filtre}
+      )
 """
 
 
@@ -288,12 +322,13 @@ WHERE s.date_enregistrement >= DATE '{cfg.date_debut_feux()}'{ouverts}{fenetre}{
 """
 
 
-def requetes_controle(bbox: tuple[float, float, float, float]) -> dict[str, str]:
+def requetes_controle(emprises: list[tuple]) -> dict[str, str]:
     """Requêtes de contrôle à passer une fois dans BigQuery, sans lesquelles on
     conclurait sur des chiffres dont on ignore la fiabilité."""
-    lon_min, lat_min, lon_max, lat_max = bbox
-    filtre = (f"lon_contrat_mgar BETWEEN {lon_min} AND {lon_max}\n"
-              f"    AND lat_contrat_mgar BETWEEN {lat_min} AND {lat_max}")
+    filtre = ("(   "
+              + _filtre_emprises(emprises, "lon_contrat_mgar", "lat_contrat_mgar")
+                .replace("\n       OR ", "\n        OR ")
+              + "\n    )")
     return {
         "jointure": f"""
 -- Ce que la jointure à 5 clés fait tomber par rapport à 3 clés : un INNER JOIN

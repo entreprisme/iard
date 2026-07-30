@@ -77,7 +77,7 @@ Le traitement cherche les contrats dans cet ordre :
 
 1. **BigQuery** — la requête est construite par `donnees.requete_contrats()`
    (jointure `contrat_mgar_gps_iris` × `contrat_mgar`, pré-filtrée sur l'emprise
-   des feux traités) ;
+   des feux traités, voir plus bas) ;
 2. **export local** — déposer le résultat de cette requête dans
    `data_incendie/export_societaires.csv`.
 
@@ -89,6 +89,34 @@ dangereux qu'une erreur.
 Même logique pour les sinistres, avec `data_incendie/export_sinistres.csv`. Si la
 table est inaccessible, `CROISER_SINISTRES = False` produit le livrable sans ce
 croisement — donc sans son seul contrôle externe.
+
+### La zone interrogée : un rectangle par feu
+
+Le pré-filtre géographique de la requête est **un rectangle par feu**, élargi de
+`MARGE_REQUETE_M` (2 km), et non un rectangle englobant tous les feux.
+
+La marge doit rester nettement au-dessus du plus grand seuil d'appariement : un
+contrat à 30 m du bord extérieur du contour doit entrer dans l'extraction pour
+pouvoir être classé.
+
+Un rectangle englobant serait sans effet sur le comptage — l'appariement reste
+géométrique, un contrat lointain ressort « hors périmètre » — mais les feux
+traités peuvent être aux deux bouts du pays :
+
+| Feux traités | Rectangle englobant | Un rectangle par feu | Surface brûlée |
+|---|---:|---:|---:|
+| Gironde + Biscarrosse | 2 720 km² | **1 377 km²** | 404 km² |
+| Gironde + Biscarrosse + Var | 101 486 km² | **1 656 km²** | 443 km² |
+
+Le rectangle couvrant les trois feux va de l'Atlantique aux Alpes, soit 229 fois
+la surface réellement brûlée. Il ramènerait des dizaines de milliers de contrats
+sans rapport avec les feux : de quoi noyer les diagnostics de doublons — le
+« cas le plus chargé » se trouvait à Salon-de-Provence, à 60 km du feu le plus
+proche — et faire scanner à BigQuery un volume sans commune mesure avec la
+question posée.
+
+Les rectangles apparaissent sur la carte sous « Limite de la zone analysée », un
+par feu.
 
 ### Un contrat = (id_societaire, numero_intercalaire)
 

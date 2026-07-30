@@ -45,9 +45,9 @@ def analyser(silencieux: bool = False) -> dict:
 
     contours, batis = donnees.charger_feux(log)
     donnees.controle_recouvrement(contours, batis, log)
-    bbox = donnees.emprise_requete(contours, log)
+    emprises = donnees.emprises_requete(contours, log)
 
-    contrats, mode = donnees.charger_contrats(donnees.requete_contrats(bbox))
+    contrats, mode = donnees.charger_contrats(donnees.requete_contrats(emprises))
     log(f"Mode = {mode.upper()} — {len(contrats):,} lignes chargées"
         .replace(",", " "))
     traitement.diagnostiquer_doublons(contrats, log)
@@ -63,7 +63,7 @@ def analyser(silencieux: bool = False) -> dict:
     export = resultats.exporter(appar)
     log(f"{len(export)} contrats exportés → {config.FICHIER_CSV}")
 
-    m = carte.construire(appar, batis, contours, bbox, log)
+    m = carte.construire(appar, batis, contours, emprises, log)
     html = carte.rendre_autonome(m, log)
     chemin = rapport.ecrire(appar, batis, html, mode, col_precision, afficher=log)
 
@@ -71,4 +71,4 @@ def analyser(silencieux: bool = False) -> dict:
             "sinistres": sinistres, "appariement": appar, "compteurs": kpi,
             "export": export, "carte": m, "livrable": chemin,
             "mode_source": mode, "mode_sinistres": mode_sin,
-            "colonne_precision": col_precision, "bbox": bbox}
+            "colonne_precision": col_precision, "emprises": emprises}
