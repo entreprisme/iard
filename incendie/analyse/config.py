@@ -22,18 +22,26 @@ from pathlib import Path
 # --------------------------------------------------------------------------- #
 # Arborescence
 # --------------------------------------------------------------------------- #
-# On part du répertoire courant et on remonte jusqu'à trouver `data_incendie`.
-# Le notebook tourne ainsi aussi bien à plat (poste d'exploration) que depuis le
-# sous-dossier incendie/ du dépôt, sans avoir à retoucher ce chemin.
+# `data_incendie` est cherché à partir de deux ancres : le répertoire courant
+# (cas normal, le notebook est lancé à côté des données) et l'emplacement du
+# package lui-même (cas d'un lancement depuis un autre dossier). On remonte les
+# parents de chacune. Le traitement tourne ainsi aussi bien depuis le dépôt —
+# data_incendie/ à la racine, à côté de incendie/ — que depuis un poste où tout
+# a été rassemblé dans un seul dossier.
+_PKG = Path(__file__).resolve().parent          # …/incendie/analyse
+_ANCRES = (Path.cwd(), _PKG.parent)             # …/incendie
+
 RACINE = Path.cwd()
-for _candidat in (RACINE, *RACINE.parents):
-    if (_candidat / "data_incendie").is_dir():
-        RACINE = _candidat
+for _ancre in _ANCRES:
+    _trouve = next((c for c in (_ancre, *_ancre.parents)
+                    if (c / "data_incendie").is_dir()), None)
+    if _trouve is not None:
+        RACINE = _trouve
         break
 
 DOSSIER_INCENDIE = RACINE / "data_incendie"
 DOSSIER_SORTIE = RACINE / "livrables"
-DOSSIER_ASSETS = Path(__file__).resolve().parent.parent / "assets"
+DOSSIER_ASSETS = _PKG.parent / "assets"
 
 FICHIER_HTML = DOSSIER_SORTIE / "carte_incendie_societaires.html"
 FICHIER_CSV = DOSSIER_SORTIE / "contrats_impactes.csv"

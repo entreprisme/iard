@@ -212,6 +212,13 @@ de relevé), puis citer son nom dans `FEUX_A_TRAITER`. Le reste suit
 automatiquement : chargement, appariement, compteurs, carte et HTML. Un nom absent
 du catalogue lève une erreur explicite avec la liste des choix possibles.
 
+Le nom du dossier et les motifs de fichiers sont **insensibles à la casse** :
+`*Bati*.shp` trouve aussi bien `BATI_concerné.shp` que `bati.shp`, et `FEU VAR`
+trouve `feu var`. Les livraisons ne sont pas normalisées, et sous Linux — où
+tourne l'automatisation — une recherche sensible à la casse ferait passer le feu
+pour dépourvu de couche bâti sans rien signaler. Dossier ou motif réellement
+introuvable : l'erreur liste ce qui est effectivement présent.
+
 ## Points d'attention sur les données source
 
 - Le contour de Biscarrosse **n'a pas de `.prj`** : le CRS est forcé à EPSG:2154

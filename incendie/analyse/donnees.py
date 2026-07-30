@@ -13,6 +13,7 @@ réelles est plus dangereux qu'un échec.
 from __future__ import annotations
 
 from datetime import datetime
+from fnmatch import fnmatch
 from pathlib import Path
 
 import geopandas as gpd
@@ -24,6 +25,39 @@ from . import config as cfg
 # --------------------------------------------------------------------------- #
 # Données incendie
 # --------------------------------------------------------------------------- #
+# Les livraisons ne sont pas normalisées : le même fichier arrive en `Bati`,
+# `BATI` ou `bati`, et les dossiers alternent de la même façon. Sous Windows la
+# casse est ignorée et le problème ne se voit pas ; sous Linux — où tourne
+# l'automatisation — `Path.glob("*Bati*.shp")` ne trouve pas `BATI.shp`, et le
+# feu passe silencieusement pour dépourvu de couche bâti. Toutes les recherches
+# de fichiers passent donc par ces deux helpers, qui comparent en minuscules.
+def _trouver(dossier: Path, motif: str) -> list[Path]:
+    """Fichiers du dossier correspondant au motif, sans tenir compte de la casse."""
+    if not dossier.is_dir():
+        return []
+    cible = motif.lower()
+    return sorted(p for p in dossier.iterdir() if fnmatch(p.name.lower(), cible))
+
+
+def _dossier_feu(nom_feu: str, nom_dossier: str) -> Path:
+    """Dossier du feu dans `data_incendie/`, sans tenir compte de la casse."""
+    racine = cfg.DOSSIER_INCENDIE
+    direct = racine / nom_dossier
+    if direct.is_dir():
+        return direct
+    if racine.is_dir():
+        cible = nom_dossier.lower()
+        for p in sorted(racine.iterdir()):
+            if p.is_dir() and p.name.lower() == cible:
+                return p
+    presents = (sorted(p.name for p in racine.iterdir() if p.is_dir())
+                if racine.is_dir() else "le dossier data_incendie/ est absent")
+    raise FileNotFoundError(
+        f"Feu « {nom_feu} » : dossier « {nom_dossier} » introuvable dans {racine}.\n"
+        f"  Dossiers présents : {presents}\n"
+        f"  Corriger la clé `dossier` du catalogue FEUX dans analyse/config.py.")
+
+
 def _lire_couche(chemin: Path, crs_defaut: int, afficher=print) -> gpd.GeoDataFrame:
     """Lit un shapefile et le ramène en Lambert 93, en réparant un CRS absent."""
     gdf = gpd.read_file(chemin)
@@ -47,8 +81,14 @@ def charger_feux(afficher=print) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
 
     contours_l, batis_l = [], []
     for nom, param in feux.items():
-        dossier = cfg.DOSSIER_INCENDIE / param["dossier"]
-        f_contour = sorted(dossier.glob(param["contour"]))[0]
+        dossier = _dossier_feu(nom, param["dossier"])
+        fichiers_contour = _trouver(dossier, param["contour"])
+        if not fichiers_contour:
+            raise FileNotFoundError(
+                f"Feu « {nom} » : aucun contour ({param['contour']}) dans {dossier}.\n"
+                f"  Fichiers présents : {sorted(p.name for p in dossier.iterdir())}\n"
+                f"  Corriger la clé `contour` du catalogue FEUX dans analyse/config.py.")
+        f_contour = fichiers_contour[0]
         afficher(f"• {nom}")
 
         contour = _lire_couche(f_contour, param["crs_defaut"], afficher)
@@ -64,7 +104,7 @@ def charger_feux(afficher=print) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
         contour["fichier"] = f_contour.name
         contours_l.append(contour[["feu", "fichier", "geometry"]])
 
-        fichiers_bati = sorted(dossier.glob(param["bati"]))
+        fichiers_bati = _trouver(dossier, param["bati"])
         if not fichiers_bati:
             if not cfg.INTEGRER_PERIMETRE:
                 raise FileNotFoundError(
