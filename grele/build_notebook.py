@@ -92,6 +92,11 @@ COULEUR_RESEAU = {"FD": "#2a78d6", "PDR": "#1baf7a"}
 # très clair, cerné d'un trait net qui porte la lecture.
 OPACITE_DISQUE = 0.10
 
+# Bornes du curseur de rayon présent sur les cartes. Le rayon initial est
+# RAYON_COUVERTURE_KM ; l'indicateur de couverture se recalcule à chaque
+# déplacement, dans le navigateur, sans rien relancer.
+CURSEUR_RAYON_KM = (5, 100, 5)      # (minimum, maximum, pas)
+
 # Distance au-delà de laquelle une plateforme ne peut pas être dans la commune
 # de son code postal — déclenche le contrôle de géocodage (§4).
 ECART_ALERTE_KM = 5.0
@@ -106,6 +111,7 @@ print("Sortie :", DOSSIER_SORTIE.resolve())
 # --------------------------------------------------------------------------- #
 code(r'''
 import difflib
+import json
 import math
 import re
 import unicodedata
@@ -378,6 +384,7 @@ if inconnus_reseau:
     raise KeyError(f"Réseau(x) sans couleur : {sorted(inconnus_reseau)} — "
                    "compléter COULEUR_RESEAU dans la cellule Réglages.")
 
+RESEAUX = sorted(pfdsp.reseau.unique())
 print(f"{len(pfdsp)} plateformes — "
       + ", ".join(f"{k} : {v}" for k, v in pfdsp.reseau.value_counts().items()))
 signalees = pfdsp[pfdsp.remarque != ""]
@@ -398,10 +405,16 @@ Combien de déclarations tombent dans le rayon d'au moins une plateforme. Le
 calcul se fait en Lambert 93 — en degrés, un rayon de 25 km n'aurait pas la même
 longueur au nord et au sud du pays.
 
-La commune est réputée couverte si **son centroïde** est dans un disque. C'est une
-approximation : une grande commune peut être partiellement couverte et compter
-pour zéro, ou l'inverse. Le total des deux réseaux dépasse le cumul, leurs
-couvertures se recouvrant.
+La commune est réputée couverte si **son centroïde** est à moins du rayon d'une
+plateforme. C'est une approximation : une grande commune peut être partiellement
+couverte et compter pour zéro, ou l'inverse. Le total des deux réseaux dépasse le
+cumul, leurs couvertures se recouvrant.
+
+Le test porte sur la **distance**, pas sur l'appartenance à un disque dessiné.
+Un disque tracé est un polygone à 64 côtés : il tombe légèrement en deçà du cercle
+et écarte quelques communes qui sont pourtant dans le rayon. La distance donne le
+compte exact, et c'est elle que le curseur des cartes réutilise — une seule
+mesure, donc un seul chiffre.
 """)
 
 code(r'''
@@ -409,9 +422,24 @@ pfdsp_l = gpd.GeoDataFrame(
     pfdsp, geometry=gpd.points_from_xy(pfdsp.longitude, pfdsp.latitude),
     crs=CRS_AFFICHAGE).to_crs(CRS_METRIQUE)
 
-rayon_m = RAYON_COUVERTURE_KM * 1000
-grele["couvert"] = centroides_l93.within(
-    pfdsp_l.geometry.buffer(rayon_m).union_all()).values
+# Distance de chaque commune à la plateforme la plus proche, par réseau.
+# 2 866 communes × 26 plateformes : la force brute suffit largement, et elle
+# évite d'introduire une dépendance pour un calcul instantané.
+xc, yc = centroides_l93.x.to_numpy(), centroides_l93.y.to_numpy()
+distance_min = pd.DataFrame(index=grele.index)
+for reseau in RESEAUX:
+    lot = pfdsp_l[pfdsp_l.reseau == reseau]
+    dx = xc[:, None] - lot.geometry.x.to_numpy()[None, :]
+    dy = yc[:, None] - lot.geometry.y.to_numpy()[None, :]
+    distance_min[reseau] = (dx ** 2 + dy ** 2).min(axis=1) ** 0.5 / 1000
+
+# Arrondi au mètre, une fois pour toutes : c'est cette valeur-là qui sert aux
+# comparaisons ici ET qui part dans la page. Arrondir après coup, ou plus
+# grossièrement d'un côté que de l'autre, ferait diverger le chiffre du notebook
+# et celui du curseur sur les communes posées juste sur le seuil.
+distance_min = distance_min.round(3)
+grele["distance_ptf_km"] = distance_min.min(axis=1)
+grele["couvert"] = grele.distance_ptf_km <= RAYON_COUVERTURE_KM
 
 total = int(grele.ANC_REF.sum())
 couverts = int(grele.loc[grele.couvert, "ANC_REF"].sum())
@@ -420,10 +448,18 @@ print(f"{couverts:,} / {total:,} sinistres à moins de {RAYON_COUVERTURE_KM:.0f}
 print(f"{int(grele.couvert.sum()):,} / {len(grele):,} communes couvertes"
       .replace(",", " "))
 
-for reseau in sorted(pfdsp.reseau.unique()):
-    zone = pfdsp_l[pfdsp_l.reseau == reseau].geometry.buffer(rayon_m).union_all()
-    n = int(grele.loc[centroides_l93.within(zone).values, "ANC_REF"].sum())
+for reseau in RESEAUX:
+    n = int(grele.loc[distance_min[reseau] <= RAYON_COUVERTURE_KM, "ANC_REF"].sum())
     print(f"   dont {reseau:<4} {n:>6,} ({n / total:.1%})".replace(",", " "))
+
+# Ce que donnerait un autre rayon — le curseur des cartes parcourt cette courbe.
+paliers = [r for r in (10, 25, 50, 75, 100) if r != RAYON_COUVERTURE_KM]
+apercu = pd.DataFrame(
+    [{"rayon_km": r,
+      "sinistres_couverts": int(grele.loc[grele.distance_ptf_km <= r, "ANC_REF"].sum()),
+      "part": f"{grele.loc[grele.distance_ptf_km <= r, 'ANC_REF'].sum() / total:.1%}"}
+     for r in sorted(paliers + [RAYON_COUVERTURE_KM])])
+display(apercu)
 ''')
 
 # --------------------------------------------------------------------------- #
@@ -481,7 +517,7 @@ def legende_html(echelle, vmax, reseaux, plafonnee=False, n=24):
         font-weight:600;">Plateformes de débosselage</div>
       {lignes}
       <div style="margin-top:6px;color:#6b7280;">
-        Disque : couverture à {RAYON_COUVERTURE_KM:.0f} km</div>
+        Disque : zone de couverture,<br>rayon réglable en haut à droite</div>
     </div>"""
 
 
@@ -503,28 +539,37 @@ disque et avec ses voisins.
 
 code(r'''
 def ajouter_plateformes(carte, pfdsp, rayon_km, opacite):
-    """Ajoute, par réseau, un groupe de disques et un groupe de points."""
+    """Ajoute, par réseau, un groupe de disques et un groupe de points.
+
+    Renvoie {réseau: [noms JS des disques]} — c'est ce que le curseur pilote.
+    """
+    noms_js = {}
     for reseau in sorted(pfdsp.reseau.unique()):
         lot = pfdsp[pfdsp.reseau == reseau]
         couleur = COULEUR_RESEAU[reseau]
 
-        disques = folium.FeatureGroup(
-            name=f"Couverture {rayon_km:.0f} km — {reseau}", show=True)
+        # Pas de distance dans le nom du calque : le curseur la fait varier.
+        disques = folium.FeatureGroup(name=f"Couverture — {reseau}", show=True)
         points = folium.FeatureGroup(
             name=f"Plateformes — {reseau} ({len(lot)})", show=True)
 
+        noms_js[reseau] = []
         for r in lot.itertuples():
             approx = ("<br><i>position approchée : "
                       f"{r.remarque}</i>" if r.position_approchee else "")
             fiche = (f"<b>{r.commune}</b> ({r.cp})<br>{r.adresse}"
                      f"<br>Réseau : <b>{r.reseau}</b>{approx}")
 
-            folium.Circle(
+            # Le rayon n'est pas dans l'infobulle : le curseur le fait varier,
+            # un texte figé y mentirait dès le premier déplacement.
+            disque = folium.Circle(
                 location=[r.latitude, r.longitude], radius=rayon_km * 1000,
                 color=couleur, weight=1.5, opacity=0.75,
                 fill=True, fill_color=couleur, fill_opacity=opacite,
-                tooltip=f"{r.commune} — {reseau} : couverture {rayon_km:.0f} km",
-            ).add_to(disques)
+                tooltip=f"{r.commune} — {reseau} : zone de couverture",
+            )
+            disque.add_to(disques)
+            noms_js[reseau].append(disque.get_name())
 
             folium.CircleMarker(
                 location=[r.latitude, r.longitude], radius=6,
@@ -536,7 +581,7 @@ def ajouter_plateformes(carte, pfdsp, rayon_km, opacite):
 
         disques.add_to(carte)
         points.add_to(carte)
-    return carte
+    return noms_js
 
 
 def fond_de_carte(centroides, departements):
@@ -546,6 +591,90 @@ def fond_de_carte(centroides, departements):
         departements, name="Départements",
         style_function=lambda _: {"color": "black", "weight": 0.75, "fillOpacity": 0},
     ).add_to(carte)
+    return carte
+
+
+def ajouter_curseur(carte, noms_js, distance_min, poids, rayon_km, bornes):
+    """Curseur de rayon et indicateur de couverture, recalculés dans la page.
+
+    Le calcul ne refait aucune géométrie : pour chaque commune on connaît déjà
+    sa distance à la plateforme la plus proche de chaque réseau. La part
+    couverte à un rayon R se lit alors sur une comparaison « distance ≤ R »,
+    2 866 fois — instantané à chaque déplacement du curseur.
+
+    C'est aussi ce qui garde le fichier raisonnable : on embarque une distance
+    par commune et par réseau, pas les 26 positions à recroiser en direct.
+    """
+    reseaux = list(noms_js)
+    lignes = [[int(n)] + [round(float(d), 3) for d in ligne]
+              for n, ligne in zip(poids, distance_min[reseaux].to_numpy())]
+    mini, maxi, pas = bornes
+
+    barres = "".join(
+        f'<div style="display:flex;align-items:center;gap:6px;margin-top:3px;">'
+        f'<span style="width:13px;height:13px;border-radius:50%;flex:none;'
+        f'background:{COULEUR_RESEAU[r]};border:2px solid #fff;'
+        f'box-shadow:0 0 0 1px rgba(0,0,0,.35);"></span>'
+        f'<span style="flex:none;width:34px;">{r}</span>'
+        f'<b id="pct_{r}" style="margin-left:auto;">–</b></div>'
+        for r in reseaux)
+
+    bloc = f"""
+<div style="position:fixed;top:12px;right:12px;z-index:9999;width:246px;
+  background:rgba(255,255,255,.95);padding:12px 14px;border-radius:8px;
+  box-shadow:0 1px 6px rgba(0,0,0,.3);
+  font:12px/1.4 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#1f2937;">
+  <div style="font-weight:600;">Rayon de couverture</div>
+  <input type="range" id="curseur_rayon" min="{mini}" max="{maxi}" step="{pas}"
+    value="{rayon_km:g}" style="width:100%;margin:8px 0 2px;">
+  <div style="display:flex;justify-content:space-between;color:#6b7280;">
+    <span>{mini} km</span><b id="valeur_rayon" style="color:#1f2937;font-size:14px;">
+    {rayon_km:g} km</b><span>{maxi} km</span></div>
+  <div style="margin-top:10px;padding-top:9px;border-top:1px solid #e5e7eb;">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;">
+      <span style="font-weight:600;">Sinistres couverts</span>
+      <b id="pct_total" style="font-size:20px;">–</b></div>
+    <div id="abs_total" style="color:#6b7280;margin-top:1px;">&nbsp;</div>
+    {barres}
+  </div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {{
+  var RESEAUX = {json.dumps(reseaux)};
+  var DISQUES = {{{", ".join(f'"{r}": [{", ".join(noms_js[r])}]' for r in reseaux)}}};
+  var LIGNES  = {json.dumps(lignes)};
+  var TOTAL   = LIGNES.reduce(function (s, l) {{ return s + l[0]; }}, 0);
+
+  var curseur = document.getElementById("curseur_rayon");
+
+  function formate(n) {{ return n.toLocaleString("fr-FR"); }}
+
+  function rafraichir(km) {{
+    var couverts = 0, parReseau = RESEAUX.map(function () {{ return 0; }});
+    for (var i = 0; i < LIGNES.length; i++) {{
+      var l = LIGNES[i], nb = l[0], dedans = false;
+      for (var j = 0; j < RESEAUX.length; j++) {{
+        if (l[j + 1] <= km) {{ parReseau[j] += nb; dedans = true; }}
+      }}
+      if (dedans) couverts += nb;
+    }}
+    document.getElementById("valeur_rayon").textContent = km + " km";
+    document.getElementById("pct_total").textContent =
+      (100 * couverts / TOTAL).toFixed(1).replace(".", ",") + " %";
+    document.getElementById("abs_total").textContent =
+      formate(couverts) + " sur " + formate(TOTAL) + " sinistres";
+    RESEAUX.forEach(function (r, j) {{
+      document.getElementById("pct_" + r).textContent =
+        (100 * parReseau[j] / TOTAL).toFixed(1).replace(".", ",") + " %";
+      DISQUES[r].forEach(function (c) {{ c.setRadius(km * 1000); }});
+    }});
+  }}
+
+  curseur.addEventListener("input", function () {{ rafraichir(+this.value); }});
+  rafraichir(+curseur.value);
+}});
+</script>"""
+    carte.get_root().html.add_child(folium.Element(bloc))
     return carte
 
 
@@ -627,7 +756,10 @@ for ligne, centre in zip(grele.itertuples(), centroides):
     ).add_to(groupe_sinistres)
 groupe_sinistres.add_to(carte_points)
 
-ajouter_plateformes(carte_points, pfdsp, RAYON_COUVERTURE_KM, OPACITE_DISQUE)
+disques_js = ajouter_plateformes(carte_points, pfdsp, RAYON_COUVERTURE_KM,
+                                     OPACITE_DISQUE)
+ajouter_curseur(carte_points, disques_js, distance_min, grele.ANC_REF,
+                RAYON_COUVERTURE_KM, CURSEUR_RAYON_KM)
 folium.LayerControl(position="bottomright", collapsed=False).add_to(carte_points)
 carte_points.get_root().html.add_child(folium.Element(LEGENDE))
 
@@ -661,7 +793,10 @@ folium.GeoJson(
         aliases=["Commune", "Code INSEE", "Nombre de sinistres"], localize=True),
 ).add_to(carte_polygones)
 
-ajouter_plateformes(carte_polygones, pfdsp, RAYON_COUVERTURE_KM, OPACITE_DISQUE)
+disques_js = ajouter_plateformes(carte_polygones, pfdsp, RAYON_COUVERTURE_KM,
+                                     OPACITE_DISQUE)
+ajouter_curseur(carte_polygones, disques_js, distance_min, grele.ANC_REF,
+                RAYON_COUVERTURE_KM, CURSEUR_RAYON_KM)
 folium.LayerControl(position="bottomright", collapsed=False).add_to(carte_polygones)
 carte_polygones.get_root().html.add_child(folium.Element(LEGENDE))
 

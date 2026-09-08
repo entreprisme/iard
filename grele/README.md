@@ -98,15 +98,41 @@ commune : il rend « Nantes » pour une adresse de Labatut. Le résoudre par la
 géométrie serait pire — les adresses de zone d'activité tombent souvent de l'autre
 côté d'une limite communale, et Aubagne deviendrait « La Penne-sur-Huveaune ».
 
-## Couverture
+## Couverture, et le curseur de rayon
 
-Le notebook chiffre la part des déclarations situées à moins de 25 km d'une
-plateforme. La commune est réputée couverte si **son centroïde** tombe dans un
-disque — approximation assumée : une grande commune peut être partiellement
-couverte et compter pour zéro, ou l'inverse.
+Les deux cartes portent, en haut à droite, un **curseur de rayon** de 5 à 100 km.
+Le déplacer redimensionne tous les disques et recalcule aussitôt la part de
+sinistres couverts — au total et par réseau. Tout se passe dans la page : rien à
+relancer, et le fichier reste ouvrable seul.
 
-Sur le jeu du 1/04 au 1/09 : **10 862 / 14 757 sinistres, soit 73,6 %**, dont FD
-56,5 % et PDR 50,9 % — le total dépasse le cumul, les deux réseaux se recouvrant.
+Le calcul ne refait aucune géométrie. Pour chaque commune on connaît sa distance
+à la plateforme la plus proche **de chaque réseau** ; la part couverte à un rayon
+R se lit alors sur une comparaison « distance ≤ R », 2 866 fois — instantané. Ce
+sont ces distances qui sont embarquées, pas les 26 positions à recroiser en direct.
+
+La commune est réputée couverte si **son centroïde** est à moins du rayon —
+approximation assumée : une grande commune peut être partiellement couverte et
+compter pour zéro, ou l'inverse.
+
+Le test porte sur la distance, jamais sur l'appartenance au disque dessiné : un
+disque tracé est un polygone à 64 côtés, il tombe un peu en deçà du cercle et
+écarterait quelques communes pourtant dans le rayon. Les distances sont arrondies
+au mètre **avant** toute comparaison, dans le notebook comme dans la page — sans
+quoi les communes posées juste sur le seuil feraient diverger les deux chiffres.
+Vérifié : les deux donnent le même compte à 10, 25, 50, 75 et 100 km.
+
+Sur le jeu du 1/04 au 1/09 :
+
+| Rayon | Sinistres couverts | Part |
+|---:|---:|---:|
+| 10 km | 8 501 | 57,6 % |
+| **25 km** | **10 863** | **73,6 %** |
+| 50 km | 12 212 | 82,8 % |
+| 75 km | 13 084 | 88,7 % |
+| 100 km | 13 800 | 93,5 % |
+
+À 25 km, FD couvre 56,5 % et PDR 50,9 % — le total dépasse le cumul, les deux
+réseaux se recouvrant.
 
 ## Dépendance réseau
 
