@@ -55,24 +55,31 @@ masquerait les sinistres, qui sont l'objet de la carte.
 
 ## Le plafond de l'échelle
 
-`PLAFOND_ECHELLE = 120`, repris du notebook d'origine. La distribution est très
-déséquilibrée : la moitié des communes comptent 1 sinistre, Marseille en compte
-2 860. Une échelle calée sur le maximum écraserait tout le reste dans la teinte la
-plus pâle.
+`PLAFOND_ECHELLE = 30`, soit le 98e centile. La distribution est très déséquilibrée :
+la moitié des communes comptent 1 sinistre, Marseille en compte 2 860. Une échelle
+calée sur le maximum écrase tout le reste dans la teinte la plus pâle.
 
-La légende affiche « 120 et + » : au-delà, les communes prennent toutes la couleur
-haute. Le notebook liste celles qui saturent et la part de sinistres qu'elles
-représentent. `PLAFOND_ECHELLE = None` revient au maximum réel.
+Le notebook d'origine plafonnait à 120. Comparé à 15, 30, 46 et 120 sur ce jeu de
+données, **30 est le réglage qui fait le mieux ressortir la structure
+géographique** : à 120 la carte est un aplat orange où le rouge n'apparaît presque
+pas, alors qu'à 30 les foyers de Bourgogne, du Rhône, de Provence et du Sud-Ouest
+se détachent nettement.
+
+La contrepartie est assumée : 55 communes saturent, soit 49 % des sinistres, et la
+couleur ne les distingue plus entre elles. Mais celles-là se repèrent de toute
+façon, et la question à l'échelle du pays est « où a-t-il grêlé », pas « laquelle
+est la pire ». La légende affiche « 30 et + », le notebook liste les dix premières
+communes saturées. `PLAFOND_ECHELLE = None` revient au maximum réel.
 
 ## La taille des points
 
-`RAYON_POINT_PX = (2, 9)` — le rayon suit la racine carrée du nombre de sinistres
-puis bute sur le maximum, atteint dès 20 sinistres (93 communes sur 2 866).
+`RAYON_POINT_PX = (2, 6)` — le rayon suit la racine carrée du nombre de sinistres
+puis bute sur le maximum, atteint dès 9 sinistres (197 communes sur 2 866).
 
 Il est volontairement bas, et **découplé du plafond de couleur**. La quantité est
 déjà portée par la couleur ; un gros disque coûte cher en lisibilité, il recouvre
 ses voisins et masque les disques de couverture, qui sont l'objet de la carte. Non
-plafonnée, Marseille ferait 107 pixels de rayon et recouvrirait un quart du pays.
+plafonné, Marseille ferait 107 pixels de rayon et recouvrirait un quart du pays.
 
 L'aire du disque, pas son rayon, doit être proportionnelle à la quantité : d'où la
 racine carrée. Un rayon proportionnel ferait paraître quatre fois pire une commune

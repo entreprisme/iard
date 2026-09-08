@@ -76,12 +76,20 @@ DOSSIER_ASSETS = Path("assets")
 # ═══ AFFICHAGE ════════════════════════════════════════════════════════════ #
 RAYON_COUVERTURE_KM = 25.0
 
-# Plafond de l'échelle de couleur, repris du notebook d'origine. La distribution
-# est très déséquilibrée — la moitié des communes ont 1 sinistre, Marseille en a
-# 2 860 — et une échelle calée sur le maximum écraserait tout le reste dans la
-# teinte la plus pâle. Au-delà du plafond, la commune prend la couleur haute.
+# Plafond de l'échelle de couleur. La distribution est très déséquilibrée — la
+# moitié des communes ont 1 sinistre, Marseille en a 2 860 — et une échelle calée
+# sur le maximum écrase tout le reste dans la teinte la plus pâle. Au-delà du
+# plafond, la commune prend la couleur haute.
+#
+# 30, soit le 98e centile, est le réglage qui fait le mieux ressortir la structure
+# géographique : à 120 (la valeur du notebook d'origine) la carte est un aplat
+# orange où le rouge n'apparaît presque pas. La contrepartie est assumée — la
+# couleur ne distingue plus les communes les plus touchées entre elles, mais
+# celles-là se repèrent de toute façon, et la question à l'échelle du pays est
+# « où a-t-il grêlé », pas « laquelle est la pire ».
+#
 # Mettre None pour caler l'échelle sur le maximum réel.
-PLAFOND_ECHELLE = 120
+PLAFOND_ECHELLE = 30
 
 # Taille des points de la carte 1, en pixels : (minimum, maximum). Le rayon suit
 # la racine carrée du nombre de sinistres, puis bute sur le maximum.
@@ -89,8 +97,8 @@ PLAFOND_ECHELLE = 120
 # Il est volontairement bas. La quantité est déjà portée par la couleur, et un
 # gros disque coûte cher en lisibilité : il recouvre ses voisins et masque les
 # disques de couverture, qui sont l'objet de la carte. Le maximum est atteint
-# dès 20 sinistres — au-delà, seule la couleur continue de distinguer.
-RAYON_POINT_PX = (2, 9)
+# dès 9 sinistres — au-delà, seule la couleur continue de distinguer.
+RAYON_POINT_PX = (2, 6)
 
 # Une couleur par réseau. Volontairement froides : l'échelle des sinistres va du
 # jaune au rouge, un réseau orange s'y confondrait. Ce couple est validé pour la
@@ -492,9 +500,10 @@ print(f"Échelle : 0 → {plafond} sinistres (maximum réel : {reel_max}, "
       f"{grele.loc[grele.ANC_REF.idxmax(), 'nom_com']})")
 if len(satures):
     print(f"{len(satures)} commune(s) au-dessus du plafond, "
-          f"{int(satures.ANC_REF.sum()):,} sinistres ({satures.ANC_REF.sum() / grele.ANC_REF.sum():.1%}) — "
-          "elles prennent toutes la couleur haute :".replace(",", " "))
-    display(satures.drop(columns="geometry").nlargest(len(satures), "ANC_REF")
+          f"{int(satures.ANC_REF.sum()):,} sinistres "
+          f"({satures.ANC_REF.sum() / grele.ANC_REF.sum():.1%}) — elles prennent "
+          "toutes la couleur haute. Les 10 premières :".replace(",", " "))
+    display(satures.drop(columns="geometry").nlargest(10, "ANC_REF")
                    .rename(columns={"ANC_REF": "nb_sinistres"}))
 
 
