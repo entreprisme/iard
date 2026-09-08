@@ -14,6 +14,11 @@ livrables/
 data_incendie/export_societaires.csv
 data_incendie/export_sinistres.csv
 
+# Sources clients : références de sinistres, adresses. Jamais versionnées.
+Classeur1*.xlsx
+PFDSP*.xlsx
+data/position_rep.xlsx
+
 # OS / éditeurs
 .DS_Store
 *.swp
