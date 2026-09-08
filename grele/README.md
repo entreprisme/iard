@@ -60,13 +60,23 @@ déséquilibrée : la moitié des communes comptent 1 sinistre, Marseille en com
 2 860. Une échelle calée sur le maximum écraserait tout le reste dans la teinte la
 plus pâle.
 
-Le plafond porte sur **la couleur et le rayon**. Sans lui, Marseille fait un
-disque de 107 pixels qui recouvre un quart du pays et masque les disques de
-couverture. La légende affiche « 120 et + » : au-delà, les communes prennent
-toutes la couleur et la taille hautes. Le notebook liste celles qui saturent et
-la part de sinistres qu'elles représentent.
+La légende affiche « 120 et + » : au-delà, les communes prennent toutes la couleur
+haute. Le notebook liste celles qui saturent et la part de sinistres qu'elles
+représentent. `PLAFOND_ECHELLE = None` revient au maximum réel.
 
-`PLAFOND_ECHELLE = None` revient au maximum réel.
+## La taille des points
+
+`RAYON_POINT_PX = (2, 9)` — le rayon suit la racine carrée du nombre de sinistres
+puis bute sur le maximum, atteint dès 20 sinistres (93 communes sur 2 866).
+
+Il est volontairement bas, et **découplé du plafond de couleur**. La quantité est
+déjà portée par la couleur ; un gros disque coûte cher en lisibilité, il recouvre
+ses voisins et masque les disques de couverture, qui sont l'objet de la carte. Non
+plafonnée, Marseille ferait 107 pixels de rayon et recouvrirait un quart du pays.
+
+L'aire du disque, pas son rayon, doit être proportionnelle à la quantité : d'où la
+racine carrée. Un rayon proportionnel ferait paraître quatre fois pire une commune
+deux fois plus touchée.
 
 ## Contrôles
 
@@ -100,10 +110,10 @@ côté d'une limite communale, et Aubagne deviendrait « La Penne-sur-Huveaune �
 
 ## Couverture, et le curseur de rayon
 
-Les deux cartes portent, en haut à droite, un **curseur de rayon** de 5 à 100 km.
-Le déplacer redimensionne tous les disques et recalcule aussitôt la part de
-sinistres couverts — au total et par réseau. Tout se passe dans la page : rien à
-relancer, et le fichier reste ouvrable seul.
+Les deux cartes portent, en haut à droite, un **curseur de rayon** de 5 à 100 km,
+au kilomètre près (`CURSEUR_RAYON_KM`). Le déplacer redimensionne tous les disques
+et recalcule aussitôt la part de sinistres couverts — au total et par réseau. Tout
+se passe dans la page : rien à relancer, et le fichier reste ouvrable seul.
 
 Le calcul ne refait aucune géométrie. Pour chaque commune on connaît sa distance
 à la plateforme la plus proche **de chaque réseau** ; la part couverte à un rayon
@@ -119,7 +129,8 @@ disque tracé est un polygone à 64 côtés, il tombe un peu en deçà du cercle
 écarterait quelques communes pourtant dans le rayon. Les distances sont arrondies
 au mètre **avant** toute comparaison, dans le notebook comme dans la page — sans
 quoi les communes posées juste sur le seuil feraient diverger les deux chiffres.
-Vérifié : les deux donnent le même compte à 10, 25, 50, 75 et 100 km.
+Vérifié : les deux donnent le même compte à 7, 10, 13, 18, 23, 25, 37, 50, 64, 75,
+99 et 100 km.
 
 Sur le jeu du 1/04 au 1/09 :
 

@@ -83,6 +83,15 @@ RAYON_COUVERTURE_KM = 25.0
 # Mettre None pour caler l'échelle sur le maximum réel.
 PLAFOND_ECHELLE = 120
 
+# Taille des points de la carte 1, en pixels : (minimum, maximum). Le rayon suit
+# la racine carrée du nombre de sinistres, puis bute sur le maximum.
+#
+# Il est volontairement bas. La quantité est déjà portée par la couleur, et un
+# gros disque coûte cher en lisibilité : il recouvre ses voisins et masque les
+# disques de couverture, qui sont l'objet de la carte. Le maximum est atteint
+# dès 20 sinistres — au-delà, seule la couleur continue de distinguer.
+RAYON_POINT_PX = (2, 9)
+
 # Une couleur par réseau. Volontairement froides : l'échelle des sinistres va du
 # jaune au rouge, un réseau orange s'y confondrait. Ce couple est validé pour la
 # vision des couleurs déficiente (écart CVD ΔE 23,1 — le seuil est 8).
@@ -95,7 +104,7 @@ OPACITE_DISQUE = 0.10
 # Bornes du curseur de rayon présent sur les cartes. Le rayon initial est
 # RAYON_COUVERTURE_KM ; l'indicateur de couverture se recalcule à chaque
 # déplacement, dans le navigateur, sans rien relancer.
-CURSEUR_RAYON_KM = (5, 100, 5)      # (minimum, maximum, pas)
+CURSEUR_RAYON_KM = (5, 100, 1)      # (minimum, maximum, pas), en km
 
 # Distance au-delà de laquelle une plateforme ne peut pas être dans la commune
 # de son code postal — déclenche le contrôle de géocodage (§4).
@@ -739,17 +748,20 @@ commune deux fois plus touchée paraît quatre fois pire.
 """)
 
 code(r'''
+rayon_min, rayon_max = RAYON_POINT_PX
+sature_taille = int((2 * (grele.ANC_REF ** 0.5) > rayon_max).sum())
+print(f"Points de {rayon_min} à {rayon_max} px — taille maximale atteinte dès "
+      f"{(rayon_max / 2) ** 2:.0f} sinistres, soit {sature_taille} commune(s) "
+      f"sur {len(grele)} ; au-delà, seule la couleur distingue.")
+
 carte_points = fond_de_carte(centroides, departements)
 
 groupe_sinistres = folium.FeatureGroup(name="Sinistres grêle (points)", show=True)
 for ligne, centre in zip(grele.itertuples(), centroides):
     nb = int(ligne.ANC_REF)
-    # Le rayon suit le même plafond que la couleur. Sans lui, Marseille et ses
-    # 2 860 sinistres font un disque de 107 px qui recouvre un quart du pays —
-    # et masque les disques de couverture, qui sont l'objet de la carte.
     folium.CircleMarker(
         location=[centre.y, centre.x],
-        radius=max(2, 2 * math.sqrt(min(nb, plafond))),
+        radius=min(rayon_max, max(rayon_min, 2 * math.sqrt(nb))),
         color=echelle(nb), fill=False, fill_color=echelle(nb),
         popup=f"{ligne.nom_com}<br>INSEE : {ligne.code_insee}<br>Sinistres : {nb}",
         tooltip=f"{ligne.nom_com} — {nb} sinistre{'s' if nb > 1 else ''}",
